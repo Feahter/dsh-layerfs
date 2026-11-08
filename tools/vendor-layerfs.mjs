@@ -55,7 +55,9 @@ export function rewriteSpecifiers(text) {
   let out = text;
   for (const [from, to] of SPECIFIERS) {
     out = out.replaceAll(
-      new RegExp(`(\\bfrom\\s*|\\bimport\\s*\\(\\s*|\\bimport\\s+)(["'])${from.replace(/[/.]/g, "\\$&")}\\2`, "g"),
+      // `from "…"`, `import "…"`, `import("…")`, and `import.meta.resolve("…")`:
+      // the last one is how api/runtime's Windows identity check names the SDK
+      new RegExp(`(\\bfrom\\s*|\\bimport\\s*\\(\\s*|\\bimport\\s+|\\bimport\\.meta\\.resolve\\(\\s*)(["'])${from.replace(/[/.]/g, "\\$&")}\\2`, "g"),
       `$1$2${to}$2`,
     );
   }

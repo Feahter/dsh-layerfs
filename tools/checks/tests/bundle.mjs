@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
+import { walk } from "../../vendor-layerfs.mjs";
 import { fileURLToPath } from "node:url";
 import { rewriteRows } from "../../assemble-bundle.mjs";
 import { rewriteSpecifiers } from "../../vendor-layerfs.mjs";
@@ -39,6 +40,23 @@ const DIST = join(ROOT, "dist");
   const assembled = rewriteRows(source).split("\n");
   assert.deepEqual(assembled, ["- insert:", "    - id: layerfs-host", "      name: 'dsh-layerfs'", "    - id: layerfs-mock", "      name: 'dsh-layerfs/mock'"]);
   assert.throws(() => rewriteRows(source.replace("layerfs-mock", "layerfs-extra")), /no ROWS entry/);
+}
+
+// the vendored SDK names no bare @layerfs specifier anywhere: import, export
+// re-export, dynamic import and import.meta.resolve — a position this rewrite
+// misses resolves against the consumer's tree and fails at run time (the
+// Windows identity check hid one until it was caught)
+{
+  const vendor = join(ROOT, "packages", "host", "vendor", "layerfs");
+  const offenders = [];
+  for (const path of walk(vendor)) {
+    if (!path.endsWith(".js")) continue;
+    const text = readFileSync(join(vendor, path), "utf8");
+    // a specifier position, not the words in a comment or in an error message
+    const pattern = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\bimport\.meta\.resolve\(\s*)(["'])[^"']*@layerfs\//g;
+    for (const match of text.match(pattern) ?? []) offenders.push(`${path}: ${match}`);
+  }
+  assert.deepEqual(offenders, [], "bare @layerfs specifiers left in the vendored tree");
 }
 
 // the assembled package, when it has been built

@@ -70,7 +70,7 @@ async function launch(settings, held) {
     child.stdin.write(frame({ secret, home: settings.wsl.home, bundle }));
   });
   // this process's @layerfs/agent must be the sealed build's (Git line endings normalized)
-  const agent = fileURLToPath(new URL("../", import.meta.resolve("@layerfs/agent")));
+  const agent = fileURLToPath(new URL("../", import.meta.resolve("#layerfs/agent")));
   try {
     if (!answer.sdk || !Object.keys(answer.sdk).length) throw refuse("Failed", "the WSL worker supplied no SDK identity");
     for (const [path, expected] of Object.entries(answer.sdk)) {
