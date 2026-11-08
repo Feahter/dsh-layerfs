@@ -13,12 +13,21 @@ import { LayerFSRuntime } from "#layerfs/runtime";
 /** Docker's volumes directory, in Docker's VM on macOS and Windows. */
 export const VOLUMES = "/var/lib/docker/volumes";
 
+/** Where this bundle's LayerFS build releases are published (a profile overrides it). */
+export const RELEASES = "https://github.com/Feahter/dsh-layerfs/releases/download";
+
+/** The plugin's own cache of LayerFS builds, one folder per pinned commit. */
+export const CACHE = join(homedir(), ".cache", "dsh-layerfs");
+
 /**
  * @typedef {object} Config
  * @property {string} [image] LayerFS runtime image digest (`sha256:…`) Sandboxes run; Init refuses without it.
  * @property {string} [daemon] Host path of the built Linux layerfs-daemon (default: the bundle's).
  * @property {string} [bundle] Folder of a sealed Linux LayerFS build. macOS and Windows need it: the
  *   home's worker runs its worker/server.js and makes every Store call (@layerfs/runtime).
+ *   Unset: this commit's cache entry, else the release asset (ensure.js).
+ * @property {string} [releases] Base URL a missing build is downloaded from (default RELEASES).
+ * @property {string} [bundleCache] Where downloaded builds are kept (default CACHE), one folder per commit.
  * @property {string} [containerPrefix] Prefix of this home's container names (default `layerfs-`):
  *   Sandboxes `<prefix><project>-<n>`, the macOS worker `<prefix>worker`. A second home on the
  *   same Docker engine (a test, another checkout) sets its own.
@@ -42,6 +51,8 @@ export const VOLUMES = "/var/lib/docker/volumes";
  * @property {string|null} image
  * @property {string|null} daemon
  * @property {string|null} bundle
+ * @property {string} releases base URL downloads come from
+ * @property {string} bundleCache cache root for downloaded builds
  * @property {string} prefix this home's container name prefix
  * @property {boolean} worker Store calls run in the home's worker (macOS, Windows), not in the caller
  * @property {string} docker
@@ -73,8 +84,10 @@ export function resolveConfig(config, profile) {
   const windows = process.platform === "win32";
   const spec = {
     image: config.image || null,
-    daemon: config.daemon || (bundle && (windows ? posix.join(bundle, "layerfs-daemon") : join(bundle, "layerfs-daemon"))),
+    daemon: config.daemon || null,
     bundle,
+    releases: config.releases || RELEASES,
+    bundleCache: config.bundleCache || CACHE,
     prefix: config.containerPrefix || "layerfs-",
     // Linux makes Store calls in the caller's process; macOS and Windows in the home's worker
     worker: process.platform !== "linux",
@@ -90,6 +103,7 @@ export function resolveConfig(config, profile) {
     backend: new URL("./agent/backend.js", import.meta.url).href,
     cli: fileURLToPath(new URL("./agent/cli.js", import.meta.url)),
   };
+  deriveDeployment(spec);
   if (windows) {
     // the Host's default before #428, so an existing WSL home stays where it is
     const hash = createHash("sha256").update(home).digest("hex").slice(0, 16);
@@ -97,6 +111,20 @@ export function resolveConfig(config, profile) {
   }
   for (const dir of [spec.stateDir, spec.traceDir]) mkdirSync(dir, { recursive: true });
   mkdirSync(spec.home, { recursive: true, mode: 0o700 });
+  return spec;
+}
+
+/**
+ * Fills the settings that follow from others, so a build that arrives later (at
+ * first boot, ensure.js) needs no second resolution pass: the daemon lives in
+ * the sealed build, and only a configured one overrides it.
+ * @param {Spec} spec settings, completed in place
+ * @returns {Spec} the same settings
+ */
+export function deriveDeployment(spec) {
+  if (!spec.daemon && spec.bundle) {
+    spec.daemon = process.platform === "win32" ? posix.join(spec.bundle, "layerfs-daemon") : join(spec.bundle, "layerfs-daemon");
+  }
   return spec;
 }
 

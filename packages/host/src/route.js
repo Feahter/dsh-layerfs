@@ -1,6 +1,7 @@
 // The /layerfs route on the Host's web server. Every request first passes
 // Connection's Host/Origin checks and browser authentication, like /api.
-//   GET  /layerfs/status                      configuration, the packages agents import and what Init offers (empty: new empty projects)
+//   GET  /layerfs/status                      configuration, what the deployment still misses (problems: the actionable reason),
+//                                             the packages agents import and what Init offers (empty: new empty projects)
 //   GET  /layerfs/workspace?folder=<abs>      every project (the folder's imports first) and the folder's default
 //   POST /layerfs/workspace {folder, project}  make a project the folder's default for new sessions
 //   POST /layerfs/init {folder?, source?, name?, image?, timeout?, empty?}   start Init LayerFS of source (default: folder),
@@ -80,7 +81,7 @@ export function registerRoutes(ctx, { spec, bindings, collector, trees, jobs = n
     const url = new URL(String(req.url), "http://localhost"), parts = url.pathname.slice(PREFIX.length).split("/").filter(Boolean);
     try {
       if (req.method === "GET" && parts[0] === "status" && parts.length === 1)
-        return send(res, 200, { configured: missingDeployment(spec).length === 0, missing: missingDeployment(spec), sdk: spec.sdk, backend: spec.backend, cli: spec.cli, worker: spec.worker, bundle: spec.bundle, traceDir: spec.traceDir, home: spec.home, docker: spec.docker, image: spec.image, daemon: spec.daemon, empty: true, ...(spec.wsl ? { wsl: spec.wsl } : {}) });
+        return send(res, 200, { configured: missingDeployment(spec).length === 0, missing: missingDeployment(spec), problems: spec.deploymentProblems ?? [], sdk: spec.sdk, backend: spec.backend, cli: spec.cli, worker: spec.worker, bundle: spec.bundle, traceDir: spec.traceDir, home: spec.home, docker: spec.docker, image: spec.image, daemon: spec.daemon, empty: true, ...(spec.wsl ? { wsl: spec.wsl } : {}) });
       if (req.method === "GET" && parts[0] === "workspace" && parts.length === 1) {
         const folder = url.searchParams.get("folder");
         if (!folder) return send(res, 400, { code: "invalid-folder", message: "folder is required" });

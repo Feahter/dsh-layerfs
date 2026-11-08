@@ -19,6 +19,7 @@ import { BindingStore } from "./binding.js";
 import { Collector } from "./collector.js";
 import z from "@deepseek-ai/schemastery";
 import { openRuntime, resolveConfig } from "./config.js";
+import { ensureDeployment } from "./ensure.js";
 import { contributor, projectContext, shimOnPath } from "./env.js";
 import { adopt } from "./init.js";
 import { registerRoutes } from "./route.js";
@@ -37,6 +38,8 @@ export const Config = z.object({
   wslNode: z.string().description("Windows: absolute Linux Node executable (default /usr/local/bin/node)"),
   containerPrefix: z.string().description("Prefix of this home's container names (default layerfs-): Sandboxes <prefix><project>-<n>, the macOS worker <prefix>worker"),
   docker: z.string().description("Local Docker Engine Unix socket"),
+  releases: z.string().description("Base URL a missing sealed LayerFS build is downloaded from (default: this bundle's GitHub releases)"),
+  bundleCache: z.string().description("Where downloaded builds are kept, one folder per commit (default: ~/.cache/dsh-layerfs)"),
   home: z.string().description("LayerFS home for discovery records (default: <temp>/dsh-layerfs/home)"),
   stateDir: z.string().description("Project bindings and agent names (default: <profile>/dsh-layerfs)"),
   traceDir: z.string().description("Per-agent SDK traces (Windows default: <workspace>/.dsh-layerfs-traces; other platforms: <temp>/dsh-layerfs/traces)"),
@@ -53,11 +56,14 @@ export function apply(ctx, config) {
   const bindings = new BindingStore(spec.stateDir);
   // projects bound before the runtime kept records get one, so it knows their volumes
   try { adopt(spec, bindings); } catch (error) { warn(`recording older projects for the runtime: ${error.message}`); }
-  const opened = openRuntime(spec);
+  // the runtime is only opened once the deployment is complete: on a first boot
+  // that means a socket, a sealed build and an image the profile never named
+  const ensured = ensureDeployment(spec, { warn });
+  const opened = ensured.then(() => openRuntime(spec));
   ctx.effect(() => () => opened.then((runtime) => runtime.close()).catch((error) => warn(error.message)), "layerfs-host: LayerFS runtime");
   // macOS and Windows: the home's worker makes every Store call. It starts with the Host
   const start = () => opened.then((runtime) => runtime.worker.start()).catch((error) => warn(`the worker did not start: ${error.message}`));
-  if (spec.worker && spec.bundle && spec.image) start();
+  ensured.then(() => { if (spec.worker && spec.bundle && spec.image) start(); });
   // a call of the Host's or an agent's that finds the worker down or gone starts it again, one start
   // at a time (the runtime's); the failed call keeps its own answer
   const collector = new Collector(ctx, spec, bindings);
