@@ -30,7 +30,7 @@ const dir = mkdtempSync(join(tmpdir(), "dsh-layerfs-agent-"));
 
 // the SDK and backend wrappers: the same named exports as their packages, the mapping done first
 {
-  const script = `const [a, w, b, v] = await Promise.all([import("@layerfs/agent"), import(${JSON.stringify(pathToFileURL(join(AGENT, "sdk.js")).href)}), import("@layerfs/backend"), import(${JSON.stringify(pathToFileURL(join(AGENT, "backend.js")).href)})]);
+  const script = `const [a, w, b, v] = await Promise.all([import("#layerfs/agent"), import(${JSON.stringify(pathToFileURL(join(AGENT, "sdk.js")).href)}), import("#layerfs/backend"), import(${JSON.stringify(pathToFileURL(join(AGENT, "backend.js")).href)})]);
 console.log(JSON.stringify({ same: Object.keys(a).every((k) => a[k] === w[k]) && Object.keys(b).every((k) => b[k] === v[k]), sdk: Object.keys(w).sort(), backend: Object.keys(v).sort(), project: process.env.LAYERFS_PROJECT }));`;
   const run = spawnSync(process.execPath, ["--input-type=module", "-e", script], { cwd: join(AGENT, ".."), encoding: "utf8", env: { PATH: process.env.PATH, DSH_LAYERFS_PROJECT: "shop" }, timeout: 60_000 });
   assert.equal(run.status, 0, run.stderr);

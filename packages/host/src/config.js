@@ -8,7 +8,7 @@ import { mkdirSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { LayerFSRuntime } from "@layerfs/runtime";
+import { LayerFSRuntime } from "#layerfs/runtime";
 
 /** Docker's volumes directory, in Docker's VM on macOS and Windows. */
 export const VOLUMES = "/var/lib/docker/volumes";

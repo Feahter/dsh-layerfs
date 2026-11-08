@@ -6,8 +6,8 @@
 // from the environment when a client is made, so the project's settings are
 // set for that synchronous step only.
 import { join } from "node:path";
-import { LayerFS } from "@layerfs/agent";
-import { LayerFSBackend } from "@layerfs/backend";
+import { LayerFS } from "#layerfs/agent";
+import { LayerFSBackend } from "#layerfs/backend";
 import { Mirror } from "@dsh-layerfs/model/mirror.js";
 import { openRuntime, VOLUMES } from "./config.js";
 

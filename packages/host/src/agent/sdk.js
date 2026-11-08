@@ -2,4 +2,4 @@
 // after env.js has set LAYERFS_* from DSH_LAYERFS_*. The SDK reads its
 // settings at LayerFS.open and per call, never at load.
 import "./env.js";
-export * from "@layerfs/agent";
+export * from "#layerfs/agent";

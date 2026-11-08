@@ -11,7 +11,7 @@
 //                                          pnpm skips preinstall when nothing else changed)
 //   node tools/layerfs-source.mjs check    also fail unless the checkout is at the pinned commit
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, readlinkSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,7 +24,15 @@ if (mode !== "link" && mode !== "check") {
   process.exit(2);
 }
 
-const source = resolve(ROOT, process.env.LAYERFS_SOURCE || pin.source);
+const isCheckout = (dir) => existsSync(join(dir, "api/agent/package.json"));
+/** LAYERFS_SOURCE, else layerfs.json's source, else wherever .layerfs already points. */
+const locate = () => {
+  if (process.env.LAYERFS_SOURCE) return resolve(ROOT, process.env.LAYERFS_SOURCE);
+  const pinned = resolve(ROOT, pin.source);
+  if (isCheckout(pinned)) return pinned;
+  try { return realpathSync(join(ROOT, ".layerfs")); } catch { return pinned; }
+};
+const source = locate();
 if (!existsSync(join(source, "api/agent/package.json"))) {
   console.error(`layerfs-source: ${source} is not a LayerFS checkout with the #428 packages (no api/agent); set LAYERFS_SOURCE to one at ${pin.commit.slice(0, 10)}`);
   process.exit(1);

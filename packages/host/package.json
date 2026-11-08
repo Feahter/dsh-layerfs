@@ -8,16 +8,19 @@
     ".": "./src/index.js",
     "./package.json": "./package.json"
   },
-  "files": ["src"],
+  "files": ["src", "vendor"],
+  "imports": {
+    "#layerfs/agent": "./vendor/layerfs/api/agent/src/index.js",
+    "#layerfs/agent/internal": "./vendor/layerfs/api/agent/src/internal.js",
+    "#layerfs/backend": "./vendor/layerfs/api/backend/src/index.js",
+    "#layerfs/runtime": "./vendor/layerfs/api/runtime/src/index.js"
+  },
   "license": "MIT",
   "engines": {
     "dsh": ">=0.2.1-alpha.4 <0.3.0"
   },
   "dependencies": {
-    "@dsh-layerfs/model": "workspace:*",
-    "@layerfs/agent": "link:../../.layerfs/api/agent",
-    "@layerfs/backend": "link:../../.layerfs/api/backend",
-    "@layerfs/runtime": "link:../../.layerfs/api/runtime"
+    "@dsh-layerfs/model": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",

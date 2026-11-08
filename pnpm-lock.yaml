@@ -34,15 +34,6 @@ importers:
       '@dsh-layerfs/model':
         specifier: workspace:*
         version: link:../model
-      '@layerfs/agent':
-        specifier: link:../../.layerfs/api/agent
-        version: link:../../.layerfs/api/agent
-      '@layerfs/backend':
-        specifier: link:../../.layerfs/api/backend
-        version: link:../../.layerfs/api/backend
-      '@layerfs/runtime':
-        specifier: link:../../.layerfs/api/runtime
-        version: link:../../.layerfs/api/runtime
 
   packages/mock: {}
 
