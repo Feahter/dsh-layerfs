@@ -85,17 +85,21 @@ store running & answering。
 2. **运行时镜像没有 registry**：manifest 里是 digest，跨机器必须能 `docker pull` 到它；本机是本地构建。
    推到 ghcr 后 P1-1 的 pull 路径才对外生效。
 3. **P1-5 CI 未做**：GitHub Actions 需要能推仓库，本次没有推送，未写 workflow。
-4. **Linux / Windows 路径未实机验证**：Linux 的 in-process Store 依赖
+4. **Windows 的 specifier 位置修过一次**：`api/runtime` 用 `import.meta.resolve("@layerfs/agent")`
+   调用 SDK，最初的改写规则没覆盖这个位置，装到消费者侧会解析失败；已补上规则，并在
+   `tools/checks/tests/bundle.mjs` 里加了「vendor 树里任何 import / re-export / 动态 import /
+   import.meta.resolve 都不得再出现 `@layerfs`」的守卫（把 bug 塞回去验证过守卫会报）。
+5. **Linux / Windows 路径未实机验证**：Linux 的 in-process Store 依赖
    `api/agent/src/transport/inprocess.js` 里 4 层向上的 `engine/crates/layerfs-node/layerfs.node`
    （vendored 布局同深度，今天两边都不存在该文件）；Windows 的 WSL 身份校验依赖 `agent/src` 字节一致，
    这一点由 vendor 的 `check` 保证但没有在 Windows 上跑过。
-5. **P2 全部未做**：市场索引、engines 兼容性核对、README 改写。
-6. **本机遗留**：一个旧项目的 Store 卷 `layerfs-shy-otter-store-mw7emov0`（213 KB，无容器）让
+6. **P2 全部未做**：市场索引、engines 兼容性核对、README 改写。
+7. **本机遗留**：一个旧项目的 Store 卷 `layerfs-shy-otter-store-mw7emov0`（213 KB，无容器）让
    `/layerfs/runtime` 的聚合 level 显示 `degraded`（"1 leftover"），与本次部署无关；插件自己的 Leaks 视图可清，
    我没有删（属于上一个 session 的项目数据）。
-7. **`packages/dsh-layerfs` 已标 `private: true`**：它是开发期的 bundle（rows 指向 `@dsh-layerfs/*`），
+8. **`packages/dsh-layerfs` 已标 `private: true`**：它是开发期的 bundle（rows 指向 `@dsh-layerfs/*`），
    发布物是 `dist/`；发布 npm 时别装错。
-8. **`link:` 开发安装在本机跑不起来（既有问题，与本次改动无关）**：把仓库目录 link 进 profile 时，
+9. **`link:` 开发安装在本机跑不起来（既有问题，与本次改动无关）**：把仓库目录 link 进 profile 时，
    `@deepseek-ai/schemastery` / `@deepseek-ai/dsh-llm` 这些 peer 从 profile 外的路径解析不到，dsh 报
    `2/3 entries did not activate`。已在 `b9bf3bc` 的干净 worktree 上复现同样报错，所以不是本次引入的回归；
    受影响的只是开发期 link 安装，`dist/` 的 tarball 安装（真实发布路径）不受影响。要修的话，方向是给
