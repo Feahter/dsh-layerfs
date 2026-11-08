@@ -1,0 +1,60 @@
+{
+  "name": "dsh-layerfs",
+  "version": "0.1.0",
+  "description": "LayerFS × DSH: agents fork, mount and merge LayerFS projects from bash, and the conversation shows who did what",
+  "icon": "./icon.svg",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./packages/host/src/index.js",
+    "./client": "./client/client.js",
+    "./mock": "./packages/mock/src/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./presets/*.patch.yml": "./presets/*.patch.yml"
+  },
+  "files": [
+    "index.js",
+    "icon.svg",
+    "cordis.patch.yml",
+    "locale",
+    "presets",
+    "client",
+    "packages"
+  ],
+  "imports": {
+    "#layerfs/agent": "./packages/host/vendor/layerfs/api/agent/src/index.js",
+    "#layerfs/agent/internal": "./packages/host/vendor/layerfs/api/agent/src/internal.js",
+    "#layerfs/backend": "./packages/host/vendor/layerfs/api/backend/src/index.js",
+    "#layerfs/runtime": "./packages/host/vendor/layerfs/api/runtime/src/index.js",
+    "#dsh/*": "./packages/model/src/*",
+    "#dsh": "./packages/model/src/index.js"
+  },
+  "license": "MIT",
+  "engines": {
+    "dsh": ">=0.2.1-alpha.4 <0.3.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-session": "*",
+    "@deepseek-ai/schemastery": "*"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    },
+    "bundle": {
+      "patch": [
+        "./cordis.patch.yml",
+        "./presets/layerfs-dsh-minimalist.patch.yml",
+        "./presets/layerfs-scenarios.patch.yml"
+      ]
+    }
+  }
+}
