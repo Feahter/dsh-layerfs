@@ -86,8 +86,11 @@ export function rewriteRows(text) {
   return out.join("\n");
 }
 
-/** Every file the assembled package must hold: dist-relative path to bytes. */
-function expected() {
+/**
+ * Every file the assembled package must hold.
+ * @returns {Map<string, Buffer>} dist-relative path to bytes
+ */
+export function expected() {
   const files = new Map();
   const put = (path, bytes) => files.set(toPosix(path), bytes);
   const copy = (from, to, rewrite = false) => {

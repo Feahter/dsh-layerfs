@@ -94,7 +94,7 @@ function docker(present = RUNNER, calls = []) {
   const seen = [];
   const { problems } = await ensureDeployment(spec, { warn: (text) => seen.push(text), pinned: COMMIT, run: docker("sha256:" + "ee".repeat(32)) });
   assert.equal(problems.length, 1);
-  assert.match(problems[0], /runtime image .* is not in this Docker engine/);
+  assert.match(problems[0], /is not in this Docker engine/);
   assert.deepEqual(seen, problems);
   // the setting stays; the runtime's own answer is about the image, not about nothing being configured
   assert.equal(spec.image, RUNNER);
@@ -125,6 +125,36 @@ function docker(present = RUNNER, calls = []) {
   const { problems } = await ensureDeployment(spec, { warn: () => {}, pinned: "cd".repeat(20), run: docker(RUNNER) });
   assert.equal(problems.length, 1, problems.join("; "));
   assert.match(problems[0], /built from /);
+}
+
+// Linux makes Store calls in this process, so the SDK has to be told where the
+// build's native addon is: the vendored tree ships source only, and without this
+// the fallback path beside it can never exist
+{
+  const spec = settings();
+  spec.worker = false;
+  const env = {};
+  await ensureDeployment(spec, { warn: () => {}, pinned: COMMIT, run: docker(RUNNER), env });
+  assert.equal(env.LAYERFS_NATIVE, join(spec.bundle, "layerfs.node"));
+  // the documented override wins over the default
+  const kept = { LAYERFS_NATIVE: "/own/layerfs.node" };
+  const second = settings();
+  second.worker = false;
+  await ensureDeployment(second, { warn: () => {}, pinned: COMMIT, run: docker(RUNNER), env: kept });
+  assert.equal(kept.LAYERFS_NATIVE, "/own/layerfs.node");
+}
+
+// Windows runs docker inside WSL: checking the host's Unix socket and the host's
+// docker CLI there would report failures no one can fix, so nothing is checked
+{
+  const spec = settings();
+  spec.docker = join(dir, "no-such.sock");
+  const calls = [];
+  const { problems } = await ensureDeployment(spec, { warn: () => {}, pinned: COMMIT, run: docker("sha256:" + "ee".repeat(32), calls), platform: "win32" });
+  assert.deepEqual(problems, []);
+  assert.deepEqual(calls, [], "no docker call from the host on Windows");
+  assert.equal(spec.docker, join(dir, "no-such.sock"));
+  assert.equal(spec.image, RUNNER, "the build still names the runtime image");
 }
 
 // a socket the profile did not name, existing only in Docker Desktop's per-user

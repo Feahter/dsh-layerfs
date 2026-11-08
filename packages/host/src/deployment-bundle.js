@@ -222,7 +222,9 @@ async function downloadTo(url, to) {
     return;
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error(`this Host downloads bundles over http(s) or file:, not ${parsed.protocol}`);
-  const response = await fetch(parsed);
+  // a stalled mirror must not hold the first boot open forever: the caller has a
+  // status page waiting to say something either way
+  const response = await fetch(parsed, { signal: AbortSignal.timeout(15 * 60_000) });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
   if (!response.body) {
     writeFileSync(to, Buffer.alloc(0));

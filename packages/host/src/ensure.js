@@ -60,9 +60,16 @@ export async function ensureDeployment(spec, options = {}) {
   const problems = [];
   const fail = (text) => { problems.push(text); warn(text); };
 
-  const socket = detectSocket(spec.docker);
-  spec.docker = socket.socket;
-  if (!socket.found) fail(socket.problem);
+  // docker lives inside WSL on Windows: this process has no engine to ask, and
+  // the runtime's own WSL paths report what is wrong there — so the checks
+  // below, which are shaped around a Unix socket, are skipped rather than
+  // reported as failures a Windows user can do nothing about
+  const windows = (options.platform ?? process.platform) === "win32";
+  if (!windows) {
+    const socket = detectSocket(spec.docker);
+    spec.docker = socket.socket;
+    if (!socket.found) fail(socket.problem);
+  }
 
   const pinned = options.pinned === undefined ? pinnedCommit() : options.pinned;
   // a build that did not verify is never read for its image: its manifest is
@@ -91,23 +98,36 @@ export async function ensureDeployment(spec, options = {}) {
     try { readSealedBundle(spec.bundle, pinned ?? undefined); buildVerified = true; } catch (error) { fail(error.message); }
   }
 
-  if (spec.image) {
-    const resolved = resolveImage(spec.image, spec.docker, run);
-    if (resolved.image) spec.image = resolved.image;
-    if (resolved.problem) fail(resolved.problem);
-  } else if (buildVerified) {
+  // the build names the runtime image it was made with, which is the one this
+  // program is written for: a profile that says nothing gets that, not a guess
+  if (!spec.image && buildVerified) {
     let manifest = null;
     try { manifest = readSealedBundle(spec.bundle, pinned ?? undefined).manifest; } catch {}
     spec.image = manifest?.images?.runtime ?? null;
-    if (spec.image) {
-      if (!hasImage(spec.image, spec.docker, run)) {
-        // the digest is the build's own; another engine only has it once it was
-        // pushed to a registry or the image was built there
-        fail(`the runtime image ${spec.image} of the LayerFS build is not in this Docker engine: pull it, or build it with "docker build -t <name> tools/runtime" and set "image" to that name`);
-      }
-    } else {
-      fail('no runtime image: the LayerFS build names none; set "image" to an image name or a sha256:… digest');
+  }
+  if (!windows && spec.image) {
+    const configured = spec.image;
+    const resolved = resolveImage(configured, spec.docker, run);
+    if (resolved.image) spec.image = resolved.image;
+    if (resolved.problem) fail(resolved.problem);
+    // a name or tag was proved to exist by the inspect resolveImage made; a
+    // digest is taken on trust there, and an engine without it refuses Init
+    // later with --pull never, so that answer is worth having now
+    else if (/^sha256:/i.test(configured) && !hasImage(spec.image, spec.docker, run)) {
+      fail(`the image ${spec.image} is not in this Docker engine: pull it (docker pull ${spec.image}), or set "image" to a name this engine has`);
     }
+  } else if (!windows && buildVerified && !spec.image) {
+    fail('no runtime image: the LayerFS build names none; set "image" to an image name or a sha256:… digest');
+  }
+
+  // Linux makes every Store call in this process, through the addon the sealed
+  // build carries beside its daemon. The vendored tree holds source only (there
+  // is no engine/ beside it to find the addon in), so name it the way the SDK
+  // reads it, and leave a set LAYERFS_NATIVE alone: it is the documented override
+  const env = options.env ?? process.env;
+  if (!spec.worker && spec.bundle) {
+    const addon = join(spec.bundle, "layerfs.node");
+    if (existsSync(addon)) env.LAYERFS_NATIVE ??= addon;
   }
 
   deriveDeployment(spec);
@@ -116,10 +136,3 @@ export async function ensureDeployment(spec, options = {}) {
   spec.deploymentProblems = problems;
   return { problems };
 }
-
-/**
- * Whether the deployment has everything the runtime needs.
- * @param {import("./config.js").Spec} spec settings
- * @returns {boolean} true when nothing is missing
- */
-export const deploymentReady = (spec) => existsSync(spec.bundle ?? "") && Boolean(spec.image && spec.daemon);

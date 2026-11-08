@@ -8,8 +8,12 @@
 ## 1. 结论
 
 `dsh plugin add <tarball>` 现在能装上、能自配置、能跑起来：全新 profile、`cordis.patch.yml` 为 `[]`，
-`/layerfs/status` 的 `missing` 与 `problems` 都为空，`/layerfs/runtime` 的 engine 为 ok、Store 的 worker
-running 且 answering。不需要 dsh 源码，不需要 LayerFS checkout，不需要 cargo，不需要手写配置。
+`/layerfs/status` 的 `missing` 与 `problems` 都为空，Store 的 worker 是新起的容器且 answering。
+不需要 dsh 源码，不需要 LayerFS checkout，不需要 cargo，不需要手写配置。
+
+**这句话有个前提**：sealed build 必须能拿到——本机缓存里有（`~/.cache/dsh-layerfs/<commit12>`），或者
+`releases` 指向的位置真的发布了资产。今天 GitHub 上没有 release（`api.github.com/repos/Feahter/dsh-layerfs/releases`
+返回 `[]`），所以**冷缓存 + 空 patch 的全新机器**会得到一条可操作的 404 报错，而不是自动装好。见 §5.1。
 
 ---
 
@@ -52,6 +56,13 @@ CLI 的 `layerfs --version` 改读 `VENDOR.json`。`agent/src` 逐字节不变�
 **P1-3 首启 ensure** `ensure.js`：socket → bundle → image → daemon 依次补齐，失败只收集不阻塞，原因写进
 `/layerfs/status` 的 `problems`（每条都带修法）。
 
+**P1 补的三处平台问题**（对抗式审查后修）：
+- Linux 的 Store 调用在本进程里通过原生 addon 走，vendored 树只有源码、旁边的 `engine/` 永远不存在 →
+  `ensure` 在 `worker === false` 时把 `LAYERFS_NATIVE` 默认指向 sealed build 里的 `layerfs.node`（已有的值不动）。
+- Windows 的 docker 在 WSL 里，主机侧的 socket 探测与 `docker -H unix://…` 必然报假错 → Windows 上跳过这些检查，
+  交给 runtime 的 WSL 路径。
+- 用户自己配的 `sha256:…` 之前不做存在性检查（Init 用 `--pull never` 时才炸）→ 现在启动时就报可操作错误。
+
 **P1-4 Docker 前提坑** `detectSocket`：配置路径 → `DOCKER_HOST` 的 `unix://` → `~/.docker/run/docker.sock`；
 都不在时给出「开启 Docker Desktop 默认 socket」或 `sudo ln -sfn …` 的具体建议。
 
@@ -89,17 +100,19 @@ store running & answering。
    调用 SDK，最初的改写规则没覆盖这个位置，装到消费者侧会解析失败；已补上规则，并在
    `tools/checks/tests/bundle.mjs` 里加了「vendor 树里任何 import / re-export / 动态 import /
    import.meta.resolve 都不得再出现 `@layerfs`」的守卫（把 bug 塞回去验证过守卫会报）。
-5. **Linux / Windows 路径未实机验证**：Linux 的 in-process Store 依赖
-   `api/agent/src/transport/inprocess.js` 里 4 层向上的 `engine/crates/layerfs-node/layerfs.node`
-   （vendored 布局同深度，今天两边都不存在该文件）；Windows 的 WSL 身份校验依赖 `agent/src` 字节一致，
-   这一点由 vendor 的 `check` 保证但没有在 Windows 上跑过。
+5. **Linux / Windows 路径未实机验证**：Linux 现在靠 `ensure` 设 `LAYERFS_NATIVE` 指向 sealed build 的
+   `layerfs.node`（单元测试覆盖），但没在 Linux 上真跑过，且该 addon 的 Node ABI 必须和宿主 node 匹配；
+   Windows 的 WSL 身份校验依赖 `agent/src` 字节一致（vendor 的 `check` 保证），也没在 Windows 上跑过。
 6. **P2 全部未做**：市场索引、engines 兼容性核对、README 改写。
-7. **本机遗留**：一个旧项目的 Store 卷 `layerfs-shy-otter-store-mw7emov0`（213 KB，无容器）让
+7. **默认 LayerFS home 是全机共享的**（`$TMPDIR/dsh-layerfs/home`）：同一台机器上第二个 profile / checkout
+   会复用正在跑的 worker 容器。验收时如果只看 `/layerfs/runtime`，很容易把"沿用旧容器"当成"新起成功"；
+   验新容器要看 `startedAt` 与 `docker ps` 的 Up 时间。本次最终验收是删掉容器与 home 后重跑的。
+8. **本机遗留**：一个旧项目的 Store 卷 `layerfs-shy-otter-store-mw7emov0`（213 KB，无容器）让
    `/layerfs/runtime` 的聚合 level 显示 `degraded`（"1 leftover"），与本次部署无关；插件自己的 Leaks 视图可清，
    我没有删（属于上一个 session 的项目数据）。
-8. **`packages/dsh-layerfs` 已标 `private: true`**：它是开发期的 bundle（rows 指向 `@dsh-layerfs/*`），
+9. **`packages/dsh-layerfs` 已标 `private: true`**：它是开发期的 bundle（rows 指向 `@dsh-layerfs/*`），
    发布物是 `dist/`；发布 npm 时别装错。
-9. **`link:` 开发安装在本机跑不起来（既有问题，与本次改动无关）**：把仓库目录 link 进 profile 时，
+10. **`link:` 开发安装在本机跑不起来（既有问题，与本次改动无关）**：把仓库目录 link 进 profile 时，
    `@deepseek-ai/schemastery` / `@deepseek-ai/dsh-llm` 这些 peer 从 profile 外的路径解析不到，dsh 报
    `2/3 entries did not activate`。已在 `b9bf3bc` 的干净 worktree 上复现同样报错，所以不是本次引入的回归；
    受影响的只是开发期 link 安装，`dist/` 的 tarball 安装（真实发布路径）不受影响。要修的话，方向是给

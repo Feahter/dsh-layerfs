@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { walk } from "../../vendor-layerfs.mjs";
 import { fileURLToPath } from "node:url";
-import { rewriteRows } from "../../assemble-bundle.mjs";
+import { expected as assembled, rewriteRows } from "../../assemble-bundle.mjs";
 import { rewriteSpecifiers } from "../../vendor-layerfs.mjs";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -61,6 +61,14 @@ const DIST = join(ROOT, "dist");
 
 // the assembled package, when it has been built
 if (existsSync(DIST)) {
+  // a dist/ left over from an older source is what a tarball gets packed from:
+  // catching it here is why `pnpm test` reruns the assembly's own comparison
+  const stale = [];
+  for (const [path, bytes] of assembled()) {
+    if (!existsSync(join(DIST, path))) stale.push(`missing ${path}`);
+    else if (!readFileSync(join(DIST, path)).equals(bytes)) stale.push(`differs ${path}`);
+  }
+  assert.deepEqual(stale.slice(0, 10), [], "dist/ is stale; run `node tools/assemble-bundle.mjs`");
   const manifest = JSON.parse(readFileSync(join(DIST, "package.json"), "utf8"));
   // a dependency would send pnpm to a registry that does not have these packages
   assert.deepEqual(manifest.dependencies ?? {}, {}, "the bundle must carry every package it runs, not declare one");
