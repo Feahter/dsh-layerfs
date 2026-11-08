@@ -65,9 +65,11 @@ export async function ensureDeployment(spec, options = {}) {
   // below, which are shaped around a Unix socket, are skipped rather than
   // reported as failures a Windows user can do nothing about
   const windows = (options.platform ?? process.platform) === "win32";
+  let socketFound = true;
   if (!windows) {
     const socket = detectSocket(spec.docker);
     spec.docker = socket.socket;
+    socketFound = socket.found;
     if (!socket.found) fail(socket.problem);
   }
 
@@ -105,7 +107,9 @@ export async function ensureDeployment(spec, options = {}) {
     try { manifest = readSealedBundle(spec.bundle, pinned ?? undefined).manifest; } catch {}
     spec.image = manifest?.images?.runtime ?? null;
   }
-  if (!windows && spec.image) {
+  // without a socket there is no engine to ask: reporting the image as absent
+  // on top of the socket problem would name a second cause that does not exist
+  if (!windows && spec.image && socketFound) {
     const configured = spec.image;
     const resolved = resolveImage(configured, spec.docker, run);
     if (resolved.image) spec.image = resolved.image;
@@ -116,7 +120,7 @@ export async function ensureDeployment(spec, options = {}) {
     else if (/^sha256:/i.test(configured) && !hasImage(spec.image, spec.docker, run)) {
       fail(`the image ${spec.image} is not in this Docker engine: pull it (docker pull ${spec.image}), or set "image" to a name this engine has`);
     }
-  } else if (!windows && buildVerified && !spec.image) {
+  } else if (!windows && socketFound && buildVerified && !spec.image) {
     fail('no runtime image: the LayerFS build names none; set "image" to an image name or a sha256:… digest');
   }
 
