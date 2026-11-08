@@ -14,7 +14,7 @@ import { LayerFSRuntime } from "#layerfs/runtime";
 export const VOLUMES = "/var/lib/docker/volumes";
 
 /** Where this bundle's LayerFS build releases are published (a profile overrides it). */
-export const RELEASES = "https://github.com/Feahter/dsh-layerfs/releases/download";
+export const RELEASES = "https://github.com/Ephemeral-AI-Lab/dsh-layerfs/releases/download";
 
 /** The plugin's own cache of LayerFS builds, one folder per pinned commit. */
 export const CACHE = join(homedir(), ".cache", "dsh-layerfs");

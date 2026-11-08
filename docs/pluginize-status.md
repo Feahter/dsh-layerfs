@@ -90,8 +90,8 @@ store running & answering。
 
 ## 5. 仍未闭环
 
-1. **没有公开 release**：`releases` 默认指向 `github.com/Feahter/dsh-layerfs/releases/download`，该位置今天
-   没有资产，所以冷缓存 + 空 patch 的机器会得到一条可操作的报错，而不是自动装好。用
+1. **没有公开 release**：`releases` 默认指向 `github.com/Ephemeral-AI-Lab/dsh-layerfs/releases/download`
+   （仓库的正源；`Feahter/dsh-layerfs` 是它的 fork），该位置今天没有资产，所以冷缓存 + 空 patch 的机器会得到一条可操作的报错，而不是自动装好。用
    `tools/release-bundle.mjs` 产出资产并上传即可闭环（本机验证用的是 `file://` 本地 release 与预热缓存）。
 2. **运行时镜像没有 registry**：manifest 里是 digest，跨机器必须能 `docker pull` 到它；本机是本地构建。
    推到 ghcr 后 P1-1 的 pull 路径才对外生效。
