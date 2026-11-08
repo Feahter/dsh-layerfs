@@ -3,3 +3,5 @@ node_modules/
 /.layerfs
 lib/
 /demo/*/raw/
+
+artifacts/

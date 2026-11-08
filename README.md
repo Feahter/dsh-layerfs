@@ -28,19 +28,51 @@
 
 `dsh-layerfs` is a plugin bundle for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh). It changes no dsh code.
 
-With the bundle, agents in a dsh session work on a LayerFS project from bash, with the `layerfs` command: one LayerFS SDK call per command (or a short Node script on the SDK for many calls). They fork Branches, test them in Sandboxes, and merge and publish, and you watch every agent's Branch grow, live. The conversation gets **Work** and **History** tabs that draw what each agent did, subagents included. The design is in [#346](https://github.com/Ephemeral-AI-Lab/layerfs/issues/346). This repository is the LayerFS UI: it moved here from the layerfs repository's `dsh/` folder at `cea713e767` ([#428](https://github.com/Ephemeral-AI-Lab/layerfs/issues/428)), and builds on a LayerFS checkout named by `LAYERFS_SOURCE` (see [Where LayerFS comes from](#where-layerfs-comes-from)).
+With the bundle, agents in a dsh session work on a LayerFS project from bash, with the `layerfs` command: one LayerFS SDK call per command (or a short Node script on the SDK for many calls). They fork Branches, test them in Sandboxes, and merge and publish, and you watch every agent's Branch grow, live. The conversation gets **Work** and **History** tabs that draw what each agent did, subagents included. The design is in [#346](https://github.com/Ephemeral-AI-Lab/layerfs/issues/346). This repository is the LayerFS UI: it moved here from the layerfs repository's `dsh/` folder at `cea713e767` ([#428](https://github.com/Ephemeral-AI-Lab/layerfs/issues/428)), and it is built from a LayerFS checkout named by `LAYERFS_SOURCE` — developers need one, an install does not (see [Develop](#-develop)).
 
 ## 📦 Install
 
-The quickest way is to let a coding agent do it. Paste this into one running on the machine where dsh web will run, in a folder holding clones of this repository and of LayerFS side by side:
+<a id="-install-into-a-dsh-profile"></a>
+
+Install the bundle into a profile with dsh's own plugin command. Nothing else is involved: no LayerFS checkout, no Rust toolchain, no dsh source tree, and no hand-written `cordis.patch.yml`.
+
+```sh
+dsh plugin --profile web add 'git+https://github.com/Feahter/dsh-layerfs.git#8b7b76d69086a277deb43d230e7af390f2080ab6&path:/dist'
+```
+
+That commit is the one [`market/index.json`](market/index.json) pins; it is on a fork of this repository until the branch lands on `main`, and the index is the same tree. The market is the other way in: **Plugins → Discover → Add index source**, the URL of an index file, then install the card. A tarball works too: `dsh plugin --profile web add ./dsh-layerfs-0.1.0.tgz` after `node tools/assemble-bundle.mjs && (cd dist && pnpm pack)`.
+
+**You need a Docker engine.** Docker Desktop on macOS, the Docker Engine on Linux, Docker inside WSL2 on Windows. The bundle starts a worker container and keeps each project's Store in a Docker volume, so nothing here works without one. A Docker Desktop installed without admin rights never creates `/var/run/docker.sock`; the bundle tries the configured socket, then `$DOCKER_HOST`, then `~/.docker/run/docker.sock`, and when none of them exists the status page names the fix instead of failing later inside a container.
+
+**The first start finishes the install itself.** It takes the sealed LayerFS build of the commit this bundle was vendored from — from `~/.cache/dsh-layerfs/<commit>` when it is already there, otherwise from the release asset — checks every file in it against that build's `manifest.json`, and refuses anything that is not the sealed build of that commit: a tampered file, another commit, or a half-downloaded copy. From the verified build it takes the runtime image digest the build was made with (or resolves the one you configured), pulls it when the engine does not have it, and starts the home's worker. Set nothing, and this is what happens.
+
+**The build itself has to come from somewhere.** The release assets of this repository are not published yet, so a machine whose `~/.cache/dsh-layerfs` has no entry for that commit gets a `problems` line naming the missing asset rather than a running deployment. Until they are published, either build the sealed bundle once (developer guide, step 1) or serve one and point `releases` at its base URL.
+
+Check it took:
+
+```sh
+DSH_HOME=$HOME/dsh-layerfs dsh --profile web     # prints http://127.0.0.1:…/?token=…
+# open that URL once, then reuse its cookie
+curl -s -H "Cookie: $COOKIE" http://127.0.0.1:3090/layerfs/status    # missing: [], problems: []
+curl -s -H "Cookie: $COOKIE" http://127.0.0.1:3090/layerfs/runtime   # engine ok, store running
+```
+
+`problems` holds one actionable sentence per gap (no Docker, no socket, image not in the engine, build not obtainable), and dsh still starts: the bundle never blocks it. Everything it fills in can be overridden in the profile's `cordis.patch.yml` under `layerfs-host` — `image` (a digest, or a tag to resolve), `bundle` (a build folder), `daemon`, `docker`, `releases` (where builds come from) and `bundleCache`.
+
+<details>
+<summary><b>Developer guide: build LayerFS and the bundle yourself</b></summary>
+
+These steps take a fresh clone of this repository to LayerFS × DSH in dsh web: first LayerFS itself, then the dsh bundle. Only dsh web is supported. dsh desktop serves the same web client but was not tested. The headless profile composes no preset registry, so it offers no preset; the Host and the bash environment still load there.
+
+The same thing, done by a coding agent from clones of both repositories, is what the agent guide below asks for:
 
 ```text
 Set up LayerFS × DSH for me: the dsh-layerfs plugin bundle in DeepSeek Harness (dsh) web, on
 real LayerFS.
 
-1. Read README.md in https://github.com/Ephemeral-AI-Lab/dsh-layerfs, the "Install" section
-   and its "Install step by step" steps. It is the guide: follow its steps in order and for
-   this machine's OS (macOS, Linux, or Windows; Windows uses the WSL2 setup below).
+1. Read README.md in https://github.com/Ephemeral-AI-Lab/dsh-layerfs, the "Developer guide"
+   steps. It is the guide: follow its steps in order and for this machine's OS (macOS, Linux,
+   or Windows; Windows uses the WSL2 setup there).
 2. Check what it needs first: Node 22.19 or newer, pnpm, Docker (Docker Desktop on macOS),
    network access, a LayerFS checkout (https://github.com/Ephemeral-AI-Lab/layerfs) at the
    commit in layerfs.json, beside this repository as ../layerfs or named by LAYERFS_SOURCE,
@@ -67,14 +99,6 @@ it prints Finished, as the guide says; if anything else fails, stop and give me 
 error, and don't retry it on your own.
 ```
 
-It follows the six steps below and asks before anything it cannot do. Expect a few minutes for the first LayerFS build.
-
-<a id="-install-into-a-dsh-profile"></a>
-<details>
-<summary><b>Install step by step: six steps, without an agent</b></summary>
-
-These steps take a fresh clone of this repository to LayerFS × DSH in dsh web: first LayerFS itself, then the dsh bundle. Only dsh web is supported. dsh desktop serves the same web client but was not tested. The headless profile composes no preset registry, so it offers no preset; the Host and the bash environment still load there.
-
 ### You need
 
 | What | For | Notes |
@@ -91,9 +115,9 @@ Below, `$DSH_LAYERFS` is this repository's absolute path, `$LAYERFS_SOURCE` the 
 
 Live needs three things from the LayerFS checkout: the JavaScript SDK, a Linux build of the daemon and the SDK's native addon, and a runtime image. Nothing is published, so you build them there.
 
-**The SDK** is LayerFS #428's three packages in its `api/` folder (`api/agent`, `api/backend`, `api/runtime`): `@layerfs/agent` (what agents' scripts call), `@layerfs/backend` (background processes, a Workspace's status, storage) and `@layerfs/runtime` (what the Host runs on a LayerFS home: the worker, Init, removal, status). They are plain JavaScript with no dependencies. Run `npm install` once in `$LAYERFS_SOURCE/api` (it only links the three to each other); the Host links them as `link:../../.layerfs/api/agent`, `…/api/backend` and `…/api/runtime`, and step 2's `pnpm install` first points `.layerfs` at `$LAYERFS_SOURCE`, then makes those links. Only the native addon is built, and a fresh clone has none (`engine/crates/layerfs-node/layerfs.node`). On macOS and Windows the Host never loads an addon itself: the home's worker runs the Linux build below. On Linux, see step 4.
+**The SDK** is LayerFS #428's three packages in its `api/` folder (`api/agent`, `api/backend`, `api/runtime`): `@layerfs/agent` (what agents' scripts call), `@layerfs/backend` (background processes, a Workspace's status, storage) and `@layerfs/runtime` (what the Host runs on a LayerFS home: the worker, Init, removal, status). They are plain JavaScript with no dependencies. Run `npm install` once in `$LAYERFS_SOURCE/api` (it only links the three to each other). The bundle does not link them at run time: step 2's `pnpm run vendor:layerfs` copies `api/{agent,backend,runtime,cli}` and the agent skill into `packages/host/vendor/layerfs` and rewrites their bare `@layerfs/*` specifiers into the `#layerfs/*` subpath imports `packages/host/package.json` declares, so an install needs no checkout; `pnpm test` fails when that copy drifts from the checkout. Only the native addon is built, and a fresh clone has none (`engine/crates/layerfs-node/layerfs.node`). On macOS and Windows the Host never loads an addon itself: the home's worker runs the Linux build below. On Linux, see step 4.
 
-**The `layerfs` command** agents run (`DSH_LAYERFS_CLI`, the Host's wrapper `packages/host/src/agent/cli.js`) runs the checkout's `api/cli/` folder: one `@layerfs/agent` call per command, JSON on stdout ([api/docs/agent.md](https://github.com/Ephemeral-AI-Lab/layerfs/blob/main/api/docs/agent.md#the-layerfs-command)). Run `npm --prefix "$LAYERFS_SOURCE/api/cli" install` once: it only links `api/cli/node_modules/@layerfs/agent` to `api/agent` and downloads nothing. `pnpm install` and `pnpm test` stop with that command when it is missing.
+**The `layerfs` command** agents run (`DSH_LAYERFS_CLI`, the Host's wrapper `packages/host/src/agent/cli.js`) runs `api/cli/`, the vendored copy of the checkout's, made by the same step: one `@layerfs/agent` call per command, JSON on stdout ([api/docs/agent.md](https://github.com/Ephemeral-AI-Lab/layerfs/blob/main/api/docs/agent.md#the-layerfs-command)). Run `npm --prefix "$LAYERFS_SOURCE/api/cli" install` once: the checkout's own tooling wants that link, and `pnpm install` and `pnpm test` stop with that command when it is missing.
 
 **The Linux build.** Build `layerfs-daemon` and the addon in the Rust 1.85.1 image, from the LayerFS checkout's root so Cargo picks up its [`.cargo/config.toml`](https://github.com/Ephemeral-AI-Lab/layerfs/blob/main/.cargo/config.toml) (the ARM64 profile). This is the recipe of LayerFS's [benchmark/AGENTS.md](https://github.com/Ephemeral-AI-Lab/layerfs/blob/main/benchmark/AGENTS.md#environment), with the crates fetched into a Docker volume instead of the host's `~/.cargo/registry`:
 
@@ -149,8 +173,11 @@ Use the ID your machine prints: the same build can get a different ID in another
 
 ```sh
 cd "$DSH_LAYERFS"
-LAYERFS_SOURCE="$LAYERFS_SOURCE" pnpm install
-pnpm run build
+LAYERFS_SOURCE="$LAYERFS_SOURCE" pnpm install   # points .layerfs at the checkout
+pnpm run vendor:layerfs                         # copies the SDK, the CLI and the skill into packages/host/vendor
+DSH_SOURCE="$DSH" pnpm run build                # the client bundle, with the dsh checkout's tsdown
+pnpm run dist                                   # assembles dist/, the installable package
+pnpm run pack:bundle                            # ... and packs it to artifacts/dsh-layerfs-0.1.0.tgz
 ```
 
 `pnpm install` first runs [`tools/layerfs-source.mjs`](tools/layerfs-source.mjs), which points the `.layerfs` link at `LAYERFS_SOURCE` (default `../layerfs`) and prints whether that checkout is at the pinned commit; see [Where LayerFS comes from](#where-layerfs-comes-from).
@@ -163,8 +190,10 @@ Choose a `DSH_HOME` of your own, so your usual `~/.dsh` is not touched, and use 
 
 ```sh
 export DSH_HOME=$HOME/dsh-layerfs        # any empty folder
-pnpm --dir "$DSH" dsh plugin --profile web add "link:$DSH_LAYERFS/packages/dsh-layerfs"
+pnpm --dir "$DSH" dsh plugin --profile web add "$DSH_LAYERFS/artifacts/dsh-layerfs-0.1.0.tgz"
 ```
+
+Install the packed tarball rather than a `link:` to the source tree: a linked package resolves its peers beside its real path, which is outside the profile, so `@deepseek-ai/schemastery` and the other peer dependencies do not resolve and the row fails to import. The tarball is copied into the profile, where dsh's own packages are.
 
 Install `dsh-layerfs` only. The demo bundle `dsh-layerfs-demo` is disabled permanently and is not in this repository. The bundle includes the LayerFS scripted model, switched off; see [Scripted runs](#scripted-runs).
 
@@ -172,7 +201,7 @@ The profile is `$DSH_HOME/profiles/web/`. Its `package.json` should now read:
 
 ```json
 "dependencies": {
-  "dsh-layerfs": "link:…/dsh-layerfs/packages/dsh-layerfs"
+  "dsh-layerfs": "file:…/dsh-layerfs/artifacts/dsh-layerfs-0.1.0.tgz"
 },
 "dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "dsh-layerfs"] } }
 ```
@@ -181,7 +210,7 @@ Making the profile by hand is the same: that `package.json`, then `pnpm install`
 
 ### 4. Configure Live
 
-The Host reads its deployment settings from `layerfs-host` in the profile's `cordis.patch.yml` ([`config.js`](packages/host/src/config.js)). dsh writes that file as `[]`; replace the `[]` with the entry list below.
+**You can skip this step.** dsh writes the profile's `cordis.patch.yml` as `[]`, and the first start fills the deployment in itself — the sealed build (from the cache, else the release asset), the runtime image digest that build was made with, and the daemon inside it — so an empty patch is a working profile. What follows is how to override that, or point the Host at a build you made yourself; every setting is read from `layerfs-host` in that file ([`config.js`](packages/host/src/config.js)).
 
 | Setting | Linux | macOS |
 |---|---|---|
@@ -194,7 +223,7 @@ The Host reads its deployment settings from `layerfs-host` in the profile's `cor
 | `containerPrefix` | `layerfs-` by default: Sandboxes `<prefix><project>-<n>` | the same, and the worker `<prefix>worker` |
 | `stateDir` | `<profile>/dsh-layerfs` by default (bindings, agent names, journals) | the same |
 
-An Init without the required settings is refused with "LayerFS is not configured: set … for layerfs-host in the profile patch"; `GET /layerfs/status` lists what is `missing`.
+An Init without the required settings is refused with "LayerFS is not configured: set … for layerfs-host in the profile patch"; `GET /layerfs/status` lists what is `missing` and `problems`, one actionable sentence each.
 
 ```yaml
 # $DSH_HOME/profiles/web/cordis.patch.yml
@@ -596,7 +625,12 @@ Run the preset's sessions in Workspace Write mode; subagents inherit it.
 | `pnpm test` | Host, scripted model, model, playback and checks tests, with LayerFS stubbed; under 10 seconds |
 | `pnpm run link:layerfs` | points `.layerfs` at `LAYERFS_SOURCE` (default `../layerfs`) |
 | `pnpm run check:layerfs` | fails unless `LAYERFS_SOURCE` (default `../layerfs`) is a LayerFS checkout at the commit in `layerfs.json` |
+| `pnpm run vendor:layerfs` | copies the SDK, the CLI and the skill from the checkout into `packages/host/vendor` |
+| `pnpm run check:vendor` | fails when that copy drifted from the checkout at the pinned commit |
 | `pnpm run build` | the client bundle, with deepseek-harness's tsdown (`DSH_SOURCE`) |
+| `pnpm run dist` | assembles `dist/`, the installable package: both faces, no dependencies |
+| `pnpm run check:dist` | fails when `dist/` is stale against the sources |
+| `pnpm run pack:bundle` | assembles and packs `artifacts/dsh-layerfs-<version>.tgz` |
 | `node tools/check-session.mjs '<dsh web URL with ?token=…>' <session id>` | checks that a session's tab draws what LayerFS reports: Branches, heads, `main`, Sandboxes, which agent made each Commit and Layer, and bash-call groups |
 
 `assets/` holds unlicensed character art and is never committed. `lib/` is build output.
@@ -607,7 +641,7 @@ Nothing of LayerFS is published yet, so this repository builds on a LayerFS chec
 
 - **`LAYERFS_SOURCE`** names it: a path, relative to this repository's root or absolute. Unset, it is `../layerfs` beside this repository.
 - **[`layerfs.json`](layerfs.json)** pins it: the default path and the LayerFS commit this repository was moved and tested at.
-- **`.layerfs`** (git-ignored) is a link to it. `pnpm install` and `pnpm test` make the link first ([`tools/layerfs-source.mjs`](tools/layerfs-source.mjs)); after changing `LAYERFS_SOURCE`, run `pnpm run link:layerfs` (pnpm skips its install step when nothing else changed). Everything reads LayerFS through the link: the Host's `@layerfs/agent`, `@layerfs/backend` and `@layerfs/runtime` are `.layerfs/api/agent`, `.layerfs/api/backend` and `.layerfs/api/runtime`, the agent skill is `.layerfs/.agents/skills/layerfs-js-sdk/`, and the model's CLI test loads the agent and backend from there.
+- **`.layerfs`** (git-ignored) is a link to it. `pnpm install` and `pnpm test` make the link first ([`tools/layerfs-source.mjs`](tools/layerfs-source.mjs)); after changing `LAYERFS_SOURCE`, run `pnpm run link:layerfs` (pnpm skips its install step when nothing else changed). The link feeds the vendoring: `pnpm run vendor:layerfs` copies `api/{agent,backend,runtime,cli}` and `.agents/skills/layerfs-js-sdk` from it into `packages/host/vendor/layerfs`, which is what the Host and the tests read, so a checkout at another commit is caught by `pnpm run check:vendor` rather than by a puzzling failure at run time.
 - **The Linux build and the runtime image** (step 1) are built from the same checkout, so the SDK, `layerfs.node` and `layerfs-daemon` match.
 
 The pin is LayerFS `main` at [`fabefdf87a`](https://github.com/Ephemeral-AI-Lab/layerfs/commit/fabefdf87a) (the #481 merge), after [v1.1.0](https://github.com/Ephemeral-AI-Lab/layerfs/releases/tag/v1.1.0) and the #463 layer split (LayerFS's Rust moved to `engine/`, the packages to `api/agent`, `api/cli`, `api/backend` and `api/runtime`). Check out that commit in `../layerfs`, or set `LAYERFS_SOURCE` to a checkout of it.
