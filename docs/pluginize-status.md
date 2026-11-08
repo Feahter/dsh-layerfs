@@ -88,7 +88,24 @@ store running & answering。
 
 ---
 
-## 5. 仍未闭环
+## 5. P2（市场与兼容）
+
+已完成：
+
+- **市场索引** `market/index.json`（`format: 1`，含 `icons/layerfs.svg`）：用 dsh 自己的
+  `@deepseek-ai/dsh-plugin-market-index` 校验通过，`marketInstallTarget` 产出的 spec 就是
+  `git+https://github.com/Feahter/dsh-layerfs.git#<commit>&path:/dist`，已用它装进全新 `DSH_HOME` 并启动验证。
+  目前 pin 的是 fork 上的提交，分支合到正源后把 `url`/`commit` 换掉即可。
+- **`dist/` 进仓库**：市场/`pnpm` 的 git 源只能指向仓库内目录，且只装那个目录，所以组装产物必须入库；
+  `pnpm test` 会比对 `dist/` 与源码（`tools/checks/tests/bundle.mjs`），漂移即失败。
+- **engines 兼容**：包与索引都写 `>=0.2.1-alpha.4 <0.3.0`；用 node-semver 对 dsh `0.2.1-rc.4` 验过
+  `satisfies` 为真，`0.3.0`、`0.2.2-rc.1` 为假——这正是市场的兼容过滤口径。`workspace:` 不能出现在
+  `engines.dsh` 里（市场校验会拒），我们用的是普通区间。
+- **README 主路径改写**：一条 `dsh plugin add` + Docker 前提 + 首启行为 + 状态检查；六步手工安装降级为
+  「Developer guide」折叠块，并按 vendoring 后的实现修正了其中已失真的三处（SDK 不再是 `link:`、
+  `layerfs` 命令来自 vendor 副本、开发安装改用打包 tarball 而不是 `link:`）。
+
+## 6. 仍未闭环
 
 1. **没有公开 release**：`releases` 默认指向 `github.com/Ephemeral-AI-Lab/dsh-layerfs/releases/download`
    （仓库的正源；`Feahter/dsh-layerfs` 是它的 fork），该位置今天没有资产，所以冷缓存 + 空 patch 的机器会得到一条可操作的报错，而不是自动装好。用

@@ -1,10 +1,16 @@
 {
   "format": 1,
-  "title": { "en": "LayerFS × DSH", "zh": "LayerFS × DSH" },
+  "title": {
+    "en": "LayerFS × DSH",
+    "zh": "LayerFS × DSH"
+  },
   "plugins": [
     {
       "name": "dsh-layerfs",
-      "title": { "en": "LayerFS × DSH", "zh": "LayerFS × DSH" },
+      "title": {
+        "en": "LayerFS × DSH",
+        "zh": "LayerFS × DSH"
+      },
       "description": {
         "en": "Agents fork, mount and merge LayerFS projects from bash, and the conversation shows who did what. Needs a running Docker engine; the sealed Linux build and the runtime image are fetched and verified on first boot.",
         "zh": "Agent 通过 bash 分叉、挂载、合并 LayerFS 项目，对话里能看清谁做了什么。需要可用的 Docker 引擎；sealed Linux 产物与运行时镜像在首启时自动获取并校验。"
@@ -12,7 +18,10 @@
       "icon": "icons/layerfs.svg",
       "author": "Ephemeral AI Lab",
       "homepage": "https://github.com/Ephemeral-AI-Lab/dsh-layerfs#readme",
-      "repository": { "url": "https://github.com/Ephemeral-AI-Lab/dsh-layerfs", "directory": "dist" },
+      "repository": {
+        "url": "https://github.com/Ephemeral-AI-Lab/dsh-layerfs",
+        "directory": "dist"
+      },
       "versions": [
         {
           "version": "0.1.0",
@@ -20,10 +29,12 @@
           "source": {
             "type": "git",
             "url": "https://github.com/Feahter/dsh-layerfs",
-            "commit": "8b7b76d69086a277deb43d230e7af390f2080ab6",
+            "commit": "7afabdb8024fc365dba6f21b1094d1d8abea01e9",
             "path": "dist"
           },
-          "engines": { "dsh": ">=0.2.1-alpha.4 <0.3.0" }
+          "engines": {
+            "dsh": ">=0.2.1-alpha.4 <0.3.0"
+          }
         }
       ]
     }

@@ -37,7 +37,7 @@ With the bundle, agents in a dsh session work on a LayerFS project from bash, wi
 Install the bundle into a profile with dsh's own plugin command. Nothing else is involved: no LayerFS checkout, no Rust toolchain, no dsh source tree, and no hand-written `cordis.patch.yml`.
 
 ```sh
-dsh plugin --profile web add 'git+https://github.com/Feahter/dsh-layerfs.git#8b7b76d69086a277deb43d230e7af390f2080ab6&path:/dist'
+dsh plugin --profile web add 'git+https://github.com/Feahter/dsh-layerfs.git#7afabdb8024fc365dba6f21b1094d1d8abea01e9&path:/dist'
 ```
 
 That commit is the one [`market/index.json`](market/index.json) pins; it is on a fork of this repository until the branch lands on `main`, and the index is the same tree. The market is the other way in: **Plugins → Discover → Add index source**, the URL of an index file, then install the card. A tarball works too: `dsh plugin --profile web add ./dsh-layerfs-0.1.0.tgz` after `node tools/assemble-bundle.mjs && (cd dist && pnpm pack)`.
